@@ -138,3 +138,29 @@ jobs:
 
           # Remove temporary SSH key
           rm -f ec2_key.pem
+
+          # 10. Send email notification
+      - name: Send email notification
+        if: always()
+        uses: dawidd6/action-send-mail@v6
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "Flask CI/CD Pipeline - ${{ job.status }}"
+          to: ${{ secrets.MAIL_TO }}
+          from: GitHub Actions <${{ secrets.MAIL_USERNAME }}>
+          body: |
+            Flask Student App CI/CD Pipeline
+
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Status: ${{ job.status }}
+
+            The CI/CD workflow has completed.
+
+            View workflow:
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
