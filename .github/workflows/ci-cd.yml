@@ -143,7 +143,7 @@ jobs:
         if: success()
         run: |
           aws sns publish \
-            --topic-arn "arn:aws:sns:us-east-1:457660516966:flask-student-deployment:d10200fb-dd55-41c8-9fea-739e1fed02ca" \
+            --topic-arn "arn:aws:sns:us-east-1:457660516966:flask-student-deployment" \
             --subject "Flask CI/CD Deployment Successful" \
             --message "Flask Student App deployment completed successfully.
 
