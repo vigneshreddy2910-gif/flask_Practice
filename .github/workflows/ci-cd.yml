@@ -26,6 +26,7 @@ jobs:
       SECRET_KEY: github-actions-test-secret
 
     steps:
+
       # 1. Checkout source code
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -77,3 +78,63 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      # 9. Deploy to EC2
+      - name: Deploy to EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: flask-student-app
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+
+          # Create temporary SSH key
+          echo "$EC2_SSH_KEY" > ec2_key.pem
+          chmod 600 ec2_key.pem
+
+          # Deploy to EC2
+          ssh -o StrictHostKeyChecking=no \
+            -i ec2_key.pem \
+            $EC2_USER@$EC2_HOST << EOF
+
+            echo "Logging into Amazon ECR..."
+
+            aws ecr get-login-password --region us-east-1 | \
+              sudo docker login \
+              --username AWS \
+              --password-stdin $ECR_REGISTRY
+
+            echo "Pulling new Docker image..."
+
+            sudo docker pull \
+              $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+            echo "Stopping old Flask container..."
+
+            sudo docker stop flask-student-app || true
+
+            echo "Removing old Flask container..."
+
+            sudo docker rm flask-student-app || true
+
+            echo "Starting new Flask container..."
+
+            sudo docker run -d \
+              --name flask-student-app \
+              --network flask-network \
+              --restart unless-stopped \
+              -p 5000:5000 \
+              -e MONGO_URI="mongodb://mongodb:27017/student_db" \
+              -e SECRET_KEY="flask-production-secret" \
+              $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+            echo "Deployment completed."
+
+            sudo docker ps
+
+          EOF
+
+          # Remove temporary SSH key
+          rm -f ec2_key.pem
