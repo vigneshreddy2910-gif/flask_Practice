@@ -138,16 +138,48 @@ jobs:
 
           # Remove temporary SSH key
           rm -f ec2_key.pem
+      notify:
+    name: Send Deployment Notification
+    needs: build-test-push
+    if: always()
+    runs-on: ubuntu-latest
 
-      - name: Send deployment email
-        if: success()
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Send Success Email
+        if: needs.build-test-push.result == 'success'
         run: |
           aws sns publish \
             --topic-arn "arn:aws:sns:us-east-1:457660516966:flask-student-deployment" \
-            --subject "Flask CI/CD Deployment Successful" \
-            --message "Flask Student App deployment completed successfully.
+            --subject "SUCCESS: Flask Student App Deployment" \
+            --message "Deployment successful.
 
           Repository: ${{ github.repository }}
           Branch: ${{ github.ref_name }}
           Commit: ${{ github.sha }}
-          Status: SUCCESS"
+          Workflow: ${{ github.workflow }}
+          Run: ${{ github.run_number }}
+
+          The Flask application was successfully tested, built, pushed to Amazon ECR, and deployed to EC2."
+
+      - name: Send Failure Email
+        if: needs.build-test-push.result == 'failure'
+        run: |
+          aws sns publish \
+            --topic-arn "arn:aws:sns:us-east-1:457660516966:flask-student-deployment" \
+            --subject "FAILED: Flask Student App Deployment" \
+            --message "Deployment FAILED.
+
+          Repository: ${{ github.repository }}
+          Branch: ${{ github.ref_name }}
+          Commit: ${{ github.sha }}
+          Workflow: ${{ github.workflow }}
+          Run: ${{ github.run_number }}
+
+          Please check the GitHub Actions workflow logs to identify the failed step."
