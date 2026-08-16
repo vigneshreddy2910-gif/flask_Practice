@@ -144,6 +144,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# AWS / SSH
+*.pem
+
 # Spyder project settings
 .spyderproject
 .spyproject
